@@ -4,3 +4,5 @@ this is a project where we try to learn the fundamentals of Artificial intellige
 
 
 run the "install dependencies" file to downloa all the dependencies
+
+run the 3x3 file
