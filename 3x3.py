@@ -18,23 +18,31 @@ colors = [(255, 255, 255), (0, 255, 0), (255, 0, 0), (0, 0, 255), (255, 165, 0),
 
 # Define the cube state (6 faces, each with 9 stickers)
 cube_state = [
-    [0] * 9,  # Front (white)
+    [3] * 9,  # Front (blue)
     [1] * 9,  # Back (green)
     [2] * 9,  # Left (red)
-    [3] * 9,  # Right (blue)
-    [4] * 9,  # Top (orange)
+    [4] * 9,  # Right (orange)
+    [0] * 9,  # Top (white)
     [5] * 9,  # Bottom (yellow)
 ]
 
 def randomize_state():
     global cube_state
-    # Create a list of all stickers
-    all_stickers = [color for face in cube_state for color in face]
-    # Shuffle all stickers
+    # Extract the center stickers (5th sticker in each face)
+    centers = [face[4] for face in cube_state]
+
+    # Create a list of all stickers excluding the center stickers
+    all_stickers = []
+    for face in cube_state:
+        all_stickers.extend(face[:4] + face[5:])  # Skip the center sticker
+    
+    # Shuffle the remaining stickers
     random.shuffle(all_stickers)
-    # Redistribute shuffled stickers to faces
+    
+    # Redistribute shuffled stickers to faces while keeping the center static
     for i in range(6):
-        cube_state[i] = all_stickers[i*9:(i+1)*9]
+        cube_state[i] = all_stickers[i*8:(i+1)*8][:4] + [centers[i]] + all_stickers[i*8:(i+1)*8][4:]
+
     print("Cube state after randomization:")
     for i, face in enumerate(cube_state):
         print(f"Face {i}: {face}")
