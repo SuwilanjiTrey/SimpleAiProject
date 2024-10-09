@@ -1,0 +1,15 @@
+what we need to implement from this is the following:
+AI.PY:
+    -this module contains the AI implementation and how it should actually solve the rubiks cube.
+        ;implementation: -breadth first search will be used to find the shortest route to solve this
+                         -depth first search can also be used but not   
+    -this also contains functions like the mind function that shold facilitate the in process communication with 
+     itself to determine if should proceed to solving the next pattern or not
+    -this module should also rotate the cube while solving it   
+        ;rotation function: this function works by rotating the cube when the ai is looking for a specific cubelet
+                            once the cubelet is found, the AI should get back to the original face it was working with 
+                            until it meets/finds the pattern defined
+
+3x3.py:
+    -
+
