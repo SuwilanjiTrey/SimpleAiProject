@@ -1,6 +1,8 @@
 import pygame
 import math
 import random
+from AI import get_cube_state, rotate_point
+
 
 # Initialize Pygame
 pygame.init()
@@ -96,23 +98,6 @@ def define_cube_faces():
 vertices = generate_cube_vertices()
 faces = define_cube_faces()
 
-# Function to handle the rotation
-def rotate_point(point, angle_x, angle_y, angle_z):
-    # Rotation around X-axis
-    y = point[1] * math.cos(angle_x) - point[2] * math.sin(angle_x)
-    z = point[1] * math.sin(angle_x) + point[2] * math.cos(angle_x)
-    point[1], point[2] = y, z
-
-    # Rotation around Y-axis
-    x = point[0] * math.cos(angle_y) + point[2] * math.sin(angle_y)
-    z = -point[0] * math.sin(angle_y) + point[2] * math.cos(angle_y)
-    point[0], point[2] = x, z
-
-    # Rotation around Z-axis
-    x = point[0] * math.cos(angle_z) - point[1] * math.sin(angle_z)
-    y = point[0] * math.sin(angle_z) + point[1] * math.cos(angle_z)
-    point[0], point[1] = x, y
-
 # Function to project 3D points to 2D space
 def project(point, screen_width, screen_height, fov, viewer_distance):
     factor = fov / (viewer_distance + point[2])
@@ -127,7 +112,8 @@ def draw_button(x, y, width, height, text):
     img = font.render(text, True, (0, 0, 0))
     screen.blit(img, (x + 10, y + 10))
 
-def AI_start(cube_state):
+def AI_start(cube_state, message):
+    get_cube_state(cube_state, message)
     # This function will be implemented later with the AI logic
     # For now, it's just a placeholder
     pass
@@ -187,23 +173,24 @@ while running:
             if 50 <= x <= 100:
                 if 100 <= y <= 150:
                     angle_x += math.pi / 16
-                    print("X+ button pressed")
+                    #print("X+ button pressed")
                 elif 150 <= y <= 200:
                     angle_y += math.pi / 16
-                    print("Y+ button pressed")
+                    #print("Y+ button pressed")
                 elif 200 <= y <= 250:
                     angle_z += math.pi / 16
-                    print("Z+ button pressed")
-            elif 50 <= x <= 150:
-                if 250 <= y <= 300:
-                    print("Randomize button pressed")
-                    randomize_state()
-                elif 300 <= y <= 350:
-                    print("AI Solve button pressed")
-                    ai_solving = True
+                    #print("Z+ button pressed")
+                elif 50 <= x <= 150:
+                    if 250 <= y <= 300:
+                        print("Randomize button pressed")
+                        randomize_state()
+                    elif 300 <= y <= 350:
+                        print("AI Solve button pressed")
+                        ai_solving = True
 
     if ai_solving:
-        AI_start(cube_state)
+        message = "proceed"
+        AI_start(cube_state, message)
         # You would update the cube state here based on AI moves
         # For now, we'll just set ai_solving back to False
         ai_solving = False
