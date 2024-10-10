@@ -1,8 +1,9 @@
 import pygame
 import math
 import random
-from AI import get_cube_state, rotate_point
-
+#from visualize import run_visual_simulation
+from Rotations import rotate_front_clockwise, rotate_front_counterclockwise, rotate_top_clockwise, rotate_top_counterclockwise, rotate_bottom_clockwise, rotate_bottom_counterclockwise, rotate_left_clockwise, rotate_left_counterclockwise, rotate_right_clockwise,  rotate_right_counterclockwise
+from Rotations import rotate_back_clockwise, rotate_back_counterclockwise 
 
 # Initialize Pygame
 pygame.init()
@@ -18,31 +19,23 @@ colors = [(255, 255, 255), (0, 255, 0), (255, 0, 0), (0, 0, 255), (255, 165, 0),
 
 # Define the cube state (6 faces, each with 9 stickers)
 cube_state = [
-    [3] * 9,  # Front (blue)
+    [0] * 9,  # Front (white)
     [1] * 9,  # Back (green)
     [2] * 9,  # Left (red)
-    [4] * 9,  # Right (orange)
-    [0] * 9,  # Top (white)
+    [3] * 9,  # Right (blue)
+    [4] * 9,  # Top (orange)
     [5] * 9,  # Bottom (yellow)
 ]
 
 def randomize_state():
     global cube_state
-    # Extract the center stickers (5th sticker in each face)
-    centers = [face[4] for face in cube_state]
-
-    # Create a list of all stickers excluding the center stickers
-    all_stickers = []
-    for face in cube_state:
-        all_stickers.extend(face[:4] + face[5:])  # Skip the center sticker
-    
-    # Shuffle the remaining stickers
+    # Create a list of all stickers
+    all_stickers = [color for face in cube_state for color in face]
+    # Shuffle all stickers
     random.shuffle(all_stickers)
-    
-    # Redistribute shuffled stickers to faces while keeping the center static
+    # Redistribute shuffled stickers to faces
     for i in range(6):
-        cube_state[i] = all_stickers[i*8:(i+1)*8][:4] + [centers[i]] + all_stickers[i*8:(i+1)*8][4:]
-
+        cube_state[i] = all_stickers[i*9:(i+1)*9]
     print("Cube state after randomization:")
     for i, face in enumerate(cube_state):
         print(f"Face {i}: {face}")
@@ -106,6 +99,23 @@ def define_cube_faces():
 vertices = generate_cube_vertices()
 faces = define_cube_faces()
 
+# Function to handle the rotation
+def rotate_point(point, angle_x, angle_y, angle_z):
+    # Rotation around X-axis
+    y = point[1] * math.cos(angle_x) - point[2] * math.sin(angle_x)
+    z = point[1] * math.sin(angle_x) + point[2] * math.cos(angle_x)
+    point[1], point[2] = y, z
+
+    # Rotation around Y-axis
+    x = point[0] * math.cos(angle_y) + point[2] * math.sin(angle_y)
+    z = -point[0] * math.sin(angle_y) + point[2] * math.cos(angle_y)
+    point[0], point[2] = x, z
+
+    # Rotation around Z-axis
+    x = point[0] * math.cos(angle_z) - point[1] * math.sin(angle_z)
+    y = point[0] * math.sin(angle_z) + point[1] * math.cos(angle_z)
+    point[0], point[1] = x, y
+
 # Function to project 3D points to 2D space
 def project(point, screen_width, screen_height, fov, viewer_distance):
     factor = fov / (viewer_distance + point[2])
@@ -120,8 +130,7 @@ def draw_button(x, y, width, height, text):
     img = font.render(text, True, (0, 0, 0))
     screen.blit(img, (x + 10, y + 10))
 
-def AI_start(cube_state, message):
-    get_cube_state(cube_state, message)
+def AI_start(cube_state):
     # This function will be implemented later with the AI logic
     # For now, it's just a placeholder
     pass
@@ -173,32 +182,56 @@ while running:
     screen.blit(solved_text, (50, 400))
 
     # Handle events
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            x, y = event.pos
-            if 50 <= x <= 100:
-                if 100 <= y <= 150:
-                    angle_x += math.pi / 16
-                    #print("X+ button pressed")
-                elif 150 <= y <= 200:
-                    angle_y += math.pi / 16
-                    #print("Y+ button pressed")
-                elif 200 <= y <= 250:
-                    angle_z += math.pi / 16
-                    #print("Z+ button pressed")
-                elif 50 <= x <= 150:
-                    if 250 <= y <= 300:
-                        print("Randomize button pressed")
-                        randomize_state()
-                    elif 300 <= y <= 350:
-                        print("AI Solve button pressed")
-                        ai_solving = True
+for event in pygame.event.get():
+    if event.type == pygame.QUIT:
+        running = False
+    elif event.type == pygame.MOUSEBUTTONDOWN:
+        x, y = event.pos
+
+        # Example button positions for different face rotations
+        if 50 <= x <= 150 and 100 <= y <= 150:  # Front face clockwise
+            print("Front face clockwise rotation")
+            rotate_front_clockwise(cube_state)
+        elif 50 <= x <= 150 and 150 <= y <= 200:  # Front face counterclockwise
+            print("Front face counterclockwise rotation")
+            rotate_front_counterclockwise(cube_state)
+        elif 200 <= x <= 300 and 100 <= y <= 150:  # Top face clockwise
+            print("Top face clockwise rotation")
+            rotate_top_clockwise(cube_state)
+        elif 200 <= x <= 300 and 150 <= y <= 200:  # Top face counterclockwise
+            print("Top face counterclockwise rotation")
+            rotate_top_counterclockwise(cube_state)
+        elif 350 <= x <= 450 and 100 <= y <= 150:  # Bottom face clockwise
+            print("Bottom face clockwise rotation")
+            rotate_bottom_clockwise(cube_state)
+        elif 350 <= x <= 450 and 150 <= y <= 200:  # Bottom face counterclockwise
+            print("Bottom face counterclockwise rotation")
+            rotate_bottom_counterclockwise(cube_state)
+        elif 500 <= x <= 600 and 100 <= y <= 150:  # Back face clockwise
+            print("Back face clockwise rotation")
+            rotate_back_clockwise(cube_state)
+        elif 500 <= x <= 600 and 150 <= y <= 200:  # Back face counterclockwise
+            print("Back face counterclockwise rotation")
+            rotate_back_counterclockwise(cube_state)
+
+        # Similarly, you can add buttons for left, right, and other faces
+        elif 650 <= x <= 750 and 100 <= y <= 150:  # Left face clockwise
+            print("Left face clockwise rotation")
+            rotate_left_clockwise(cube_state)
+        elif 650 <= x <= 750 and 150 <= y <= 200:  # Left face counterclockwise
+            print("Left face counterclockwise rotation")
+            rotate_left_counterclockwise(cube_state)
+        elif 800 <= x <= 900 and 100 <= y <= 150:  # Right face clockwise
+            print("Right face clockwise rotation")
+            rotate_right_clockwise(cube_state)
+        elif 800 <= x <= 900 and 150 <= y <= 200:  # Right face counterclockwise
+            print("Right face counterclockwise rotation")
+            rotate_right_counterclockwise(cube_state)
+
 
     if ai_solving:
-        message = "proceed"
-        AI_start(cube_state, message)
+        AI_start(cube_state)
+        run_visual_simulation() #runs the visual represention when ai is triggered
         # You would update the cube state here based on AI moves
         # For now, we'll just set ai_solving back to False
         ai_solving = False
