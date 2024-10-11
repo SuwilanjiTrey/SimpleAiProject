@@ -1,3 +1,4 @@
+
 // script.js
 
 // Scene, camera, and renderer setup
@@ -28,174 +29,463 @@ let cubeState = [
 ];
 
 // Create a function to generate the Rubik's Cube based on the current state
-function createRubiksCube() {
-    const cubletSize = 0.6; // Size of each individual cublet
-    const cublets = []; // Store cublet meshes
 
-    // Create the cublets in a 3D grid for each face
+const cubletSize = 1;
+const spacing = 0.1;
+const cubeSize = 3 * cubletSize + 2 * spacing;
+
+let isAnimating = false;
+
+
+// Create the Rubik's Cube
+function createRubiksCube() {
+    const cube = new THREE.Group();
+    const cublets = [];
+
     for (let x = -1; x <= 1; x++) {
         for (let y = -1; y <= 1; y++) {
             for (let z = -1; z <= 1; z++) {
-                // Skip the center cublet
-                if (x === 0 && y === 0 && z === 0) continue;
-
-                const geometry = new THREE.BoxGeometry(cubletSize, cubletSize, cubletSize);
-                const materials = [
-                    new THREE.MeshBasicMaterial({ color: colors[cubeState[0][getCubletIndex(x, y, z, 'front')] || 0], side: THREE.DoubleSide }), // Front
-                    new THREE.MeshBasicMaterial({ color: colors[cubeState[1][getCubletIndex(x, y, z, 'back')] || 1], side: THREE.DoubleSide }), // Back
-                    new THREE.MeshBasicMaterial({ color: colors[cubeState[2][getCubletIndex(x, y, z, 'left')] || 2], side: THREE.DoubleSide }), // Left
-                    new THREE.MeshBasicMaterial({ color: colors[cubeState[3][getCubletIndex(x, y, z, 'right')] || 3], side: THREE.DoubleSide }), // Right
-                    new THREE.MeshBasicMaterial({ color: colors[cubeState[4][getCubletIndex(x, y, z, 'top')] || 4], side: THREE.DoubleSide }), // Top
-                    new THREE.MeshBasicMaterial({ color: colors[cubeState[5][getCubletIndex(x, y, z, 'bottom')] || 5], side: THREE.DoubleSide }) // Bottom
-                ];
-
-                const cublet = new THREE.Mesh(geometry, materials);
-                // Position the cublet in the 3D space
-                cublet.position.set(x * cubletSize, y * cubletSize, z * cubletSize);
-                scene.add(cublet);
-                cublets.push(cublet); // Store the cublet mesh
+                const cublet = createCublet(x, y, z);
+                cube.add(cublet);
+                cublets.push(cublet);
             }
         }
     }
-    return cublets; // Return array of cublet meshes
+
+    scene.add(cube);
+    return { cube, cublets };
 }
+
+
+
+// Update the createCublet function
+function createCublet(x, y, z) {
+    const geometry = new THREE.BoxGeometry(cubletSize, cubletSize, cubletSize);
+    const materials = colors.map(color => new THREE.MeshBasicMaterial({ color }));
+    const cublet = new THREE.Mesh(geometry, materials);
+    cublet.position.set(
+        x * (cubletSize + spacing),
+        y * (cubletSize + spacing),
+        z * (cubletSize + spacing)
+    );
+    cublet.userData.originalPosition = new THREE.Vector3(x, y, z);
+    return cublet;
+}
+
+const { cube, cublets } = createRubiksCube();
 
 // Function to get the index of a cublet based on its position
 function getCubletIndex(x, y, z, face) {
-    // Map positions to the cublet index for each face
     const indices = {
-        front: { 0: 3, 1: 4, 2: 5, '-1': 6 }, // Front face colors
-        back: { 0: 6, 1: 7, 2: 8, '-1': 0 }, // Back face colors
-        left: { 0: 0, 1: 3, 2: 6, '-1': 2 }, // Left face colors
-        right: { 0: 2, 1: 5, 2: 8, '-1': 1 }, // Right face colors
-        top: { 0: 2, 1: 3, 2: 4, '-1': 1 }, // Top face colors
-        bottom: { 0: 4, 1: 5, 2: 6, '-1': 3 } // Bottom face colors
+        front: [6, 7, 8, 3, 4, 5, 0, 1, 2],
+        back: [2, 1, 0, 5, 4, 3, 8, 7, 6],
+        left: [0, 3, 6, 1, 4, 7, 2, 5, 8],
+        right: [8, 5, 2, 7, 4, 1, 6, 3, 0],
+        top: [6, 3, 0, 7, 4, 1, 8, 5, 2],
+        bottom: [2, 5, 8, 1, 4, 7, 0, 3, 6]
     };
-
-    return indices[face][y] || 0; // Get the index for the specified face
+    
+    const index = (y + 1) * 3 + (x + 1);
+    return indices[face][index];
 }
 
-// Call the function to create the Rubik's Cube
-let cublets = createRubiksCube();
+
 
 // Set camera position
+camera.position.set(3, 3, 3);
+camera.lookAt(0, 0, 0);
 
-// Set camera position
-camera.position.set(3, 3, 3); // Adjusted camera position for better view of the cube
-camera.lookAt(1, 0, 0); // Look at the center of the cube
-
-
-// Variables to track rotation on each axis
+// Variables to track rotation
 let rotationSpeed = 0.01;
 let rotationX = 0;
 let rotationY = 0;
-let rotationZ = 0;
 
-// UI setup for buttons
+// Modify the randomizeCube function
+let moveQueue = [];
+
+async function randomizeCube() {
+    if (isAnimating) return;
+    isAnimating = true;
+
+    const moves = ['F', 'B', 'L', 'R', 'U', 'D', "F'", "B'", "L'", "R'", "U'", "D'"];
+    const numMoves = 20;
+
+    for (let i = 0; i < numMoves; i++) {
+        const randomMove = moves[Math.floor(Math.random() * moves.length)];
+        moveQueue.push(randomMove);
+    }
+
+    await processMoveQueue();
+    isAnimating = false;
+}
+
+async function processMoveQueue() {
+    while (moveQueue.length > 0) {
+        const move = moveQueue.shift();
+        await performMove(move);
+    }
+}
+
+// Call processMoveQueue in your main loop or after user interactions
+// Call fixCubletPositions after each move or periodically
+function update() {
+    if (!isAnimating && moveQueue.length > 0) {
+        processMoveQueue().then(() => {
+            fixCubletPositions();
+        });
+    }
+    requestAnimationFrame(update);
+}
+update();
+
+// Function to perform a move
+async function performMove(move) {
+    const [face, modifier] = move.split('');
+    const clockwise = modifier !== "'";
+    let axis, layer;
+
+    switch (face) {
+        case 'F': axis = 'z'; layer = 1; break;
+        case 'B': axis = 'z'; layer = -1; break;
+        case 'L': axis = 'x'; layer = -1; break;
+        case 'R': axis = 'x'; layer = 1; break;
+        case 'U': axis = 'y'; layer = 1; break;
+        case 'D': axis = 'y'; layer = -1; break;
+    }
+
+    const angle = clockwise ? Math.PI/2 : -Math.PI/2;
+
+    await rotateFace(axis, layer, angle);
+}
+
+// Update the updateCubeState function to use these new functions
+function updateCubeState(axis, layer, clockwise) {
+    const faceIndex = axis === 'x' ? (layer > 0 ? 3 : 2) :
+                      axis === 'y' ? (layer > 0 ? 4 : 5) :
+                      (layer > 0 ? 0 : 1);
+    
+    // Rotate the face
+    rotateFaceState(faceIndex, clockwise);
+    
+    // Rotate adjacent edges
+    const adjacentFaces = getAdjacentFaces(axis, layer);
+    rotateAdjacentEdges(adjacentFaces, clockwise);
+}
+
+function getAdjacentFaces(axis, layer) {
+    // Assuming the faces are numbered as follows:
+    // 0: Front, 1: Back, 2: Left, 3: Right, 4: Top, 5: Bottom
+    switch(axis) {
+        case 'x':
+            return layer > 0 ? [0, 4, 1, 5] : [0, 5, 1, 4];
+        case 'y':
+            return layer > 0 ? [0, 3, 1, 2] : [0, 2, 1, 3];
+        case 'z':
+            return layer > 0 ? [4, 3, 5, 2] : [4, 2, 5, 3];
+    }
+}
+
+function rotateFaceState(faceIndex, clockwise) {
+    const face = cubeState[faceIndex];
+    const newFace = [...face];
+    if (clockwise) {
+        [newFace[0], newFace[1], newFace[2], newFace[3], newFace[5], newFace[6], newFace[7], newFace[8]] = 
+        [newFace[6], newFace[3], newFace[0], newFace[7], newFace[1], newFace[8], newFace[5], newFace[2]];
+    } else {
+        [newFace[0], newFace[1], newFace[2], newFace[3], newFace[5], newFace[6], newFace[7], newFace[8]] = 
+        [newFace[2], newFace[5], newFace[8], newFace[1], newFace[7], newFace[0], newFace[3], newFace[6]];
+    }
+    cubeState[faceIndex] = newFace;
+}
+
+
+// Functions to rotate adjacent faces
+function rotateAdjacentEdges(adjacentFaces, clockwise) {
+    const [f1, f2, f3, f4] = adjacentFaces;
+    let temp;
+    if (clockwise) {
+        temp = [cubeState[f1][2], cubeState[f1][5], cubeState[f1][8]];
+        [cubeState[f1][2], cubeState[f1][5], cubeState[f1][8]] = [cubeState[f4][2], cubeState[f4][5], cubeState[f4][8]];
+        [cubeState[f4][2], cubeState[f4][5], cubeState[f4][8]] = [cubeState[f3][2], cubeState[f3][5], cubeState[f3][8]];
+        [cubeState[f3][2], cubeState[f3][5], cubeState[f3][8]] = [cubeState[f2][2], cubeState[f2][5], cubeState[f2][8]];
+        [cubeState[f2][2], cubeState[f2][5], cubeState[f2][8]] = temp;
+    } else {
+        temp = [cubeState[f1][2], cubeState[f1][5], cubeState[f1][8]];
+        [cubeState[f1][2], cubeState[f1][5], cubeState[f1][8]] = [cubeState[f2][2], cubeState[f2][5], cubeState[f2][8]];
+        [cubeState[f2][2], cubeState[f2][5], cubeState[f2][8]] = [cubeState[f3][2], cubeState[f3][5], cubeState[f3][8]];
+        [cubeState[f3][2], cubeState[f3][5], cubeState[f3][8]] = [cubeState[f4][2], cubeState[f4][5], cubeState[f4][8]];
+        [cubeState[f4][2], cubeState[f4][5], cubeState[f4][8]] = temp;
+    }
+}
+
+function rotateAdjacentToBack(clockwise) {
+    let temp;
+    if (clockwise) {
+        temp = [cubeState[4][0], cubeState[4][1], cubeState[4][2]];
+        [cubeState[4][0], cubeState[4][1], cubeState[4][2]] = [cubeState[3][2], cubeState[3][5], cubeState[3][8]];
+        [cubeState[3][2], cubeState[3][5], cubeState[3][8]] = [cubeState[5][8], cubeState[5][7], cubeState[5][6]];
+        [cubeState[5][8], cubeState[5][7], cubeState[5][6]] = [cubeState[2][6], cubeState[2][3], cubeState[2][0]];
+        [cubeState[2][6], cubeState[2][3], cubeState[2][0]] = temp;
+    } else {
+        temp = [cubeState[4][0], cubeState[4][1], cubeState[4][2]];
+        [cubeState[4][0], cubeState[4][1], cubeState[4][2]] = [cubeState[2][6], cubeState[2][3], cubeState[2][0]];
+        [cubeState[2][6], cubeState[2][3], cubeState[2][0]] = [cubeState[5][8], cubeState[5][7], cubeState[5][6]];
+        [cubeState[5][8], cubeState[5][7], cubeState[5][6]] = [cubeState[3][2], cubeState[3][5], cubeState[3][8]];
+        [cubeState[3][2], cubeState[3][5], cubeState[3][8]] = temp;
+    }
+}
+
+function rotateAdjacentToLeft(clockwise) {
+    let temp;
+    if (clockwise) {
+        temp = [cubeState[0][0], cubeState[0][3], cubeState[0][6]];
+        [cubeState[0][0], cubeState[0][3], cubeState[0][6]] = [cubeState[5][0], cubeState[5][3], cubeState[5][6]];
+        [cubeState[5][0], cubeState[5][3], cubeState[5][6]] = [cubeState[1][8], cubeState[1][5], cubeState[1][2]];
+        [cubeState[1][8], cubeState[1][5], cubeState[1][2]] = [cubeState[4][0], cubeState[4][3], cubeState[4][6]];
+        [cubeState[4][0], cubeState[4][3], cubeState[4][6]] = temp;
+    } else {
+        temp = [cubeState[0][0], cubeState[0][3], cubeState[0][6]];
+        [cubeState[0][0], cubeState[0][3], cubeState[0][6]] = [cubeState[4][0], cubeState[4][3], cubeState[4][6]];
+        [cubeState[4][0], cubeState[4][3], cubeState[4][6]] = [cubeState[1][8], cubeState[1][5], cubeState[1][2]];
+        [cubeState[1][8], cubeState[1][5], cubeState[1][2]] = [cubeState[5][0], cubeState[5][3], cubeState[5][6]];
+        [cubeState[5][0], cubeState[5][3], cubeState[5][6]] = temp;
+    }
+}
+
+function rotateAdjacentToRight(clockwise) {
+    let temp;
+    if (clockwise) {
+        temp = [cubeState[0][2], cubeState[0][5], cubeState[0][8]];
+        [cubeState[0][2], cubeState[0][5], cubeState[0][8]] = [cubeState[4][2], cubeState[4][5], cubeState[4][8]];
+        [cubeState[4][2], cubeState[4][5], cubeState[4][8]] = [cubeState[1][6], cubeState[1][3], cubeState[1][0]];
+        [cubeState[1][6], cubeState[1][3], cubeState[1][0]] = [cubeState[5][2], cubeState[5][5], cubeState[5][8]];
+        [cubeState[5][2], cubeState[5][5], cubeState[5][8]] = temp;
+    } else {
+        temp = [cubeState[0][2], cubeState[0][5], cubeState[0][8]];
+        [cubeState[0][2], cubeState[0][5], cubeState[0][8]] = [cubeState[5][2], cubeState[5][5], cubeState[5][8]];
+        [cubeState[5][2], cubeState[5][5], cubeState[5][8]] = [cubeState[1][6], cubeState[1][3], cubeState[1][0]];
+        [cubeState[1][6], cubeState[1][3], cubeState[1][0]] = [cubeState[4][2], cubeState[4][5], cubeState[4][8]];
+        [cubeState[4][2], cubeState[4][5], cubeState[4][8]] = temp;
+    }
+}
+
+function rotateAdjacentToUp(clockwise) {
+    let temp;
+    if (clockwise) {
+        temp = [cubeState[0][0], cubeState[0][1], cubeState[0][2]];
+        [cubeState[0][0], cubeState[0][1], cubeState[0][2]] = [cubeState[3][0], cubeState[3][1], cubeState[3][2]];
+        [cubeState[3][0], cubeState[3][1], cubeState[3][2]] = [cubeState[1][0], cubeState[1][1], cubeState[1][2]];
+        [cubeState[1][0], cubeState[1][1], cubeState[1][2]] = [cubeState[2][0], cubeState[2][1], cubeState[2][2]];
+        [cubeState[2][0], cubeState[2][1], cubeState[2][2]] = temp;
+    } else {
+        temp = [cubeState[0][0], cubeState[0][1], cubeState[0][2]];
+        [cubeState[0][0], cubeState[0][1], cubeState[0][2]] = [cubeState[2][0], cubeState[2][1], cubeState[2][2]];
+        [cubeState[2][0], cubeState[2][1], cubeState[2][2]] = [cubeState[1][0], cubeState[1][1], cubeState[1][2]];
+        [cubeState[1][0], cubeState[1][1], cubeState[1][2]] = [cubeState[3][0], cubeState[3][1], cubeState[3][2]];
+        [cubeState[3][0], cubeState[3][1], cubeState[3][2]] = temp;
+    }
+}
+
+function rotateAdjacentToDown(clockwise) {
+    let temp;
+    if (clockwise) {
+        temp = [cubeState[0][6], cubeState[0][7], cubeState[0][8]];
+        [cubeState[0][6], cubeState[0][7], cubeState[0][8]] = [cubeState[2][6], cubeState[2][7], cubeState[2][8]];
+        [cubeState[2][6], cubeState[2][7], cubeState[2][8]] = [cubeState[1][6], cubeState[1][7], cubeState[1][8]];
+        [cubeState[1][6], cubeState[1][7], cubeState[1][8]] = [cubeState[3][6], cubeState[3][7], cubeState[3][8]];
+        [cubeState[3][6], cubeState[3][7], cubeState[3][8]] = temp;
+    } else {
+        temp = [cubeState[0][6], cubeState[0][7], cubeState[0][8]];
+        [cubeState[0][6], cubeState[0][7], cubeState[0][8]] = [cubeState[3][6], cubeState[3][7], cubeState[3][8]];
+        [cubeState[3][6], cubeState[3][7], cubeState[3][8]] = [cubeState[1][6], cubeState[1][7], cubeState[1][8]];
+        [cubeState[1][6], cubeState[1][7], cubeState[1][8]] = [cubeState[2][6], cubeState[2][7], cubeState[2][8]];
+        [cubeState[2][6], cubeState[2][7], cubeState[2][8]] = temp;
+    }
+}
+
+
+
+// Update the rotateFace function
+function rotateFace(axis, layer, angle) {
+    return new Promise((resolve) => {
+        const rotationGroup = new THREE.Group();
+        const layerValue = layer * (cubletSize + spacing);
+        
+        // Collect all cublets in the layer
+        const cublets = cube.children.filter(cublet => {
+            const position = cublet.position[axis];
+            return Math.abs(position - layerValue) < 0.1;
+        });
+        
+        // Attach cublets to the rotation group
+        cublets.forEach(cublet => {
+            rotationGroup.attach(cublet);
+        });
+
+        scene.add(rotationGroup);
+
+        new TWEEN.Tween(rotationGroup.rotation)
+            .to({ [axis]: angle }, 500)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .onComplete(() => {
+                // Reattach cublets to the main cube
+                while (rotationGroup.children.length) {
+                    const cublet = rotationGroup.children[0];
+                    cube.attach(cublet);
+                    
+                    // Update the cublet's position and rotation
+                    cublet.updateMatrixWorld(true);
+                    const worldPos = new THREE.Vector3();
+                    cublet.getWorldPosition(worldPos);
+                    
+                    // Round the position to the nearest grid point
+                    cublet.position.x = Math.round(worldPos.x / (cubletSize + spacing)) * (cubletSize + spacing);
+                    cublet.position.y = Math.round(worldPos.y / (cubletSize + spacing)) * (cubletSize + spacing);
+                    cublet.position.z = Math.round(worldPos.z / (cubletSize + spacing)) * (cubletSize + spacing);
+                    
+                    // Update the cublet's rotation
+                    const rotation = new THREE.Euler().setFromRotationMatrix(cublet.matrixWorld);
+                    cublet.rotation.copy(rotation);
+                }
+                scene.remove(rotationGroup);
+                updateCubeState(axis, layer, angle > 0);
+                resolve();
+            })
+            .start();
+    });
+}
+// Add a function to check and fix cublet positions
+function fixCubletPositions() {
+    cube.children.forEach(cublet => {
+        const originalPos = cublet.userData.originalPosition;
+        const currentPos = cublet.position.clone().divideScalar(cubletSize + spacing).round();
+        
+        if (!currentPos.equals(originalPos)) {
+            console.log('Fixing cublet position:', originalPos, 'to', currentPos);
+            cublet.position.copy(currentPos.multiplyScalar(cubletSize + spacing));
+        }
+    });
+}
+
+
+
+function resetCube() {
+    cube.children.forEach((cublet, index) => {
+        const x = (index % 3) - 1;
+        const y = Math.floor((index / 3) % 3) - 1;
+        const z = Math.floor(index / 9) - 1;
+        
+        cublet.position.set(
+            x * (cubletSize + spacing),
+            y * (cubletSize + spacing),
+            z * (cubletSize + spacing)
+        );
+        cublet.rotation.set(0, 0, 0);
+    });
+    
+    // Reset the cube state
+    cubeState = [
+        Array(9).fill(0), // Front
+        Array(9).fill(1), // Back
+        Array(9).fill(2), // Left
+        Array(9).fill(3), // Right
+        Array(9).fill(4), // Top
+        Array(9).fill(5)  // Bottom
+    ];
+}
+
+
+
+
+// Add this function to log the cube state in a more readable format
+function logCubeState() {
+    console.log("Current Cube State:");
+    const faceNames = ['Front', 'Back', 'Left', 'Right', 'Top', 'Bottom'];
+    cubeState.forEach((face, index) => {
+        console.log(`${faceNames[index]}:`);
+        for (let i = 0; i < 9; i += 3) {
+            console.log(face.slice(i, i + 3).join(' '));
+        }
+    });
+}
+
+// Call this function after createRubiksCube and after randomizeCube
+logCubeState();
+
+
+
+
+// UI setup for randomize button
+// Modify the createButtons function to include a "Log Cube State" button
 function createButtons() {
     const buttonContainer = document.createElement('div');
     buttonContainer.style.position = 'absolute';
     buttonContainer.style.top = '20px';
     buttonContainer.style.left = '20px';
 
-    const aiButton = document.createElement('button');
-    aiButton.innerText = 'Trigger AI';
-    aiButton.style.margin = '5px';
-    aiButton.onclick = () => {
-        console.log('AI triggered'); // Placeholder for AI functionality
-        // Call your AI rotation logic here
-    };
-
     const randomizeButton = document.createElement('button');
     randomizeButton.innerText = 'Randomize Cube';
     randomizeButton.style.margin = '5px';
-    randomizeButton.onclick = () => {
-        console.log('Cube randomized'); // Shuffle the cube state
-        randomizeCube();
-    };
+    randomizeButton.onclick = randomizeCube;
 
-    buttonContainer.appendChild(aiButton);
+    const logStateButton = document.createElement('button');
+    logStateButton.innerText = 'Log Cube State';
+    logStateButton.style.margin = '5px';
+    logStateButton.onclick = logCubeState;
+
+    const resetButton = document.createElement('button');
+    resetButton.innerText = 'Reset Cube';
+    resetButton.style.margin = '5px';
+    resetButton.onclick = resetCube;
+
+    const floatButton = document.createElement('button');
+    floatButton.innerText = 'Toggle Float';
+    floatButton.style.margin = '5px';
+    floatButton.onclick = toggleFloating;
+
     buttonContainer.appendChild(randomizeButton);
+    buttonContainer.appendChild(logStateButton);
+    buttonContainer.appendChild(resetButton);
+    buttonContainer.appendChild(floatButton);
     document.body.appendChild(buttonContainer);
 }
 
-// Shuffle the cube state and update colors
-function randomizeCube() {
-    // Create a new shuffled cube state for all faces
-    let newState = [
-        shuffleArray(cubeState[0].slice()), // Shuffle Front face
-        shuffleArray(cubeState[1].slice()), // Shuffle Back face
-        shuffleArray(cubeState[2].slice()), // Shuffle Left face
-        shuffleArray(cubeState[3].slice()), // Shuffle Right face
-        shuffleArray(cubeState[4].slice()), // Shuffle Top face
-        shuffleArray(cubeState[5].slice())  // Shuffle Bottom face
-    ];
 
-    // Update the cubeState with the new shuffled state
-    cubeState = newState;
-
-    // Update the materials of the cublets
-    cublets.forEach((cublet, index) => {
-        const x = Math.floor((index % 27) / 9) - 1; // -1, 0, 1 for x
-        const y = (Math.floor(index % 9) - 1) * -1; // 1, 0, -1 for y
-        const z = (index % 3) - 1; // -1, 0, 1 for z
-
-        // Update cublet colors based on shuffled state
-        cublet.material[0].color.set(colors[cubeState[0][getCubletIndex(x, y, z, 'front')] || 0]); // Front
-        cublet.material[1].color.set(colors[cubeState[1][getCubletIndex(x, y, z, 'back')] || 1]); // Back
-        cublet.material[2].color.set(colors[cubeState[2][getCubletIndex(x, y, z, 'left')] || 2]); // Left
-        cublet.material[3].color.set(colors[cubeState[3][getCubletIndex(x, y, z, 'right')] || 3]); // Right
-        cublet.material[4].color.set(colors[cubeState[4][getCubletIndex(x, y, z, 'top')] || 4]); // Top
-        cublet.material[5].color.set(colors[cubeState[5][getCubletIndex(x, y, z, 'bottom')] || 5]); // Bottom
-    });
-}
-
-// Function to get the index of a cublet based on its position
-function getCubletIndex(x, y, z, face) {
-    // Map positions to the cublet index for each face
-    const indices = {
-        front: { 0: 3, 1: 4, 2: 5, '-1': 6 }, // Front face colors
-        back: { 0: 6, 1: 7, 2: 8, '-1': 0 }, // Back face colors
-        left: { 0: 0, 1: 3, 2: 6, '-1': 2 }, // Left face colors
-        right: { 0: 2, 1: 5, 2: 8, '-1': 1 }, // Right face colors
-        top: { 0: 2, 1: 3, 2: 4, '-1': 1 }, // Top face colors
-        bottom: { 0: 4, 1: 5, 2: 6, '-1': 3 } // Bottom face colors
-    };
-
-    return indices[face][y] || 0; // Get the index for the specified face
-}
-
-
-// Shuffle utility function
-function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]]; // Swap elements
-    }
-    return array;
-}
-
-// Call the function to create buttons
 createButtons();
 
 // Animation loop
-function animate() {
+let isFloating = false;
+let floatSpeed = 0.01;
+
+// Modify the animate function
+function animate(time) {
     requestAnimationFrame(animate);
-
-    // Apply rotation to the entire cube based on the specified speeds
-    scene.rotation.x += rotationX;
-    scene.rotation.y += rotationY;
-    scene.rotation.z += rotationZ;
-
+    TWEEN.update(time);
+    
+    // Only apply rotation when floating is enabled
+    if (isFloating) {
+        cube.rotation.x += rotationX;
+        cube.rotation.y += rotationY;
+    }
+    
     renderer.render(scene, camera);
 }
 
-// Mouse event to control rotation
-document.addEventListener('mousemove', (event) => {
-    // Adjust rotation based on mouse movement
-    rotationX = (event.clientY / window.innerHeight - 0.5) * rotationSpeed;
-    rotationY = (event.clientX / window.innerWidth - 0.5) * rotationSpeed;
-});
+// Add a function to toggle floating
+function toggleFloating() {
+    isFloating = !isFloating;
+    // Reset rotation when floating is disabled
+    if (!isFloating) {
+        cube.rotation.set(0, 0, 0);
+    }
+}
 
+// Modify the mouse event listener to only update rotation values when floating
+document.addEventListener('mousemove', (event) => {
+    if (isFloating) {
+        rotationX = (event.clientY / window.innerHeight - 0.5) * floatSpeed;
+        rotationY = (event.clientX / window.innerWidth - 0.5) * floatSpeed;
+    }
+});
 // Start the animation loop
 animate();
