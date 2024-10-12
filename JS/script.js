@@ -10,13 +10,14 @@ document.body.appendChild(renderer.domElement);
 
 // Define colors for the cube faces
 const colors = [
-    0xffffff, // Front (white)
-    0x00ff00, // Back (green)
-    0xff0000, // Left (red)
-    0x0000ff, // Right (blue)
-    0xffa500, // Top (orange)
+    0x00ff00, // Front (green)
+    0x0000ff, // Back (blue)
+    0xffa500, // Left (orange)
+    0xff0000, // Right (red)
+    0xffffff, // Top (white)
     0xffff00  // Bottom (yellow)
 ];
+
 
 // Create an array to represent the cube's state
 let cubeState = [
@@ -103,26 +104,85 @@ let rotationY = 0;
 // Modify the randomizeCube function
 let moveQueue = [];
 
+// Modify the randomizeCube function to send the state after shuffling
 async function randomizeCube() {
     if (isAnimating) return;
     isAnimating = true;
 
-    const moves = ['F', 'B', 'L', 'R', 'U', 'D', "F'", "B'", "L'", "R'", "U'", "D'"];
-    const numMoves = 20;
-
-    for (let i = 0; i < numMoves; i++) {
-        const randomMove = moves[Math.floor(Math.random() * moves.length)];
-        moveQueue.push(randomMove);
-    }
+    const shuffleSequence = await requestShuffleSequence();
+    moveQueue = shuffleSequence;
 
     await processMoveQueue();
+    await sendCubeState();  // Send the new state to the AI
     isAnimating = false;
 }
+
 
 async function processMoveQueue() {
     while (moveQueue.length > 0) {
         const move = moveQueue.shift();
         await performMove(move);
+    }
+}
+
+function getColorName(colorIndex) {
+    const colorMap = {
+        0: 'white',
+        1: 'green',
+        2: 'red',
+        3: 'blue',
+        4: 'orange',
+        5: 'yellow'
+    };
+    return colorMap[colorIndex] || 'unknown';
+}
+
+
+
+// Add this function to request a shuffle sequence from the server
+async function requestShuffleSequence(numMoves = 20) {
+    try {
+        const response = await fetch(`http://localhost:5000/shuffle?moves=${numMoves}`);
+        const data = await response.json();
+        return data.moves;
+    } catch (error) {
+        console.error('Error fetching shuffle sequence:', error);
+        return [];
+    }
+}
+
+// Add this function to send the current cube state to the server
+// Modify the sendCubeState function to include color information
+async function sendCubeState() {
+    const colorState = cubeState.map(face => 
+        face.map(colorIndex => getColorName(colorIndex))
+    );
+    
+    try {
+        const response = await fetch('http://localhost:5000/update_state', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ state: colorState }),
+        });
+        const data = await response.json();
+        console.log(data.message);
+    } catch (error) {
+        console.error('Error sending cube state:', error);
+    }
+}
+
+// Add this function to check for a specific pattern
+async function checkPattern(patternName) {
+    try {
+        const response = await fetch(`http://localhost:5000/check_pattern?pattern=${patternName}`);
+        const data = await response.json();
+        console.log(`Pattern check (${patternName}):`, data.result, '-', data.message);
+        return data.result;
+    } catch (error) {
+        console.error('Error checking pattern:', error);
+        return false;
     }
 }
 
@@ -137,6 +197,31 @@ function update() {
     requestAnimationFrame(update);
 }
 update();
+
+// Add this function to solve the cube
+async function solveCube() {
+    if (isAnimating) return;
+    isAnimating = true;
+
+    const { moves, messages } = await requestSolve();
+    console.log('AI messages:', messages);
+    moveQueue = moves;
+
+    await processMoveQueue();
+    isAnimating = false;
+}
+
+// Add this function to request solving moves from the server
+async function requestSolve() {
+    try {
+        const response = await fetch('http://localhost:5000/solve');
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error fetching solve sequence:', error);
+        return { moves: [], messages: ['Error communicating with server'] };
+    }
+}
 
 // Function to perform a move
 async function performMove(move) {
@@ -156,6 +241,10 @@ async function performMove(move) {
     const angle = clockwise ? Math.PI/2 : -Math.PI/2;
 
     await rotateFace(axis, layer, angle);
+
+    
+    await rotateFace(axis, layer, angle);
+    await sendCubeState();  
 }
 
 // Update the updateCubeState function to use these new functions
@@ -304,7 +393,6 @@ function rotateAdjacentToDown(clockwise) {
 }
 
 
-
 // Update the rotateFace function
 function rotateFace(axis, layer, angle) {
     return new Promise((resolve) => {
@@ -443,6 +531,26 @@ function createButtons() {
     floatButton.style.margin = '5px';
     floatButton.onclick = toggleFloating;
 
+    
+    const aiShuffleButton = document.createElement('button');
+    aiShuffleButton.innerText = 'AI Shuffle';
+    aiShuffleButton.style.margin = '5px';
+    aiShuffleButton.onclick = randomizeCube;
+
+    const checkSolvedButton = document.createElement('button');
+    checkSolvedButton.innerText = 'Check if Solved';
+    checkSolvedButton.style.margin = '5px';
+    checkSolvedButton.onclick = () => checkPattern('solved');
+
+
+    const aiSolveButton = document.createElement('button');
+    aiSolveButton.innerText = 'AI Solve';
+    aiSolveButton.style.margin = '5px';
+    aiSolveButton.onclick = solveCube;
+
+    buttonContainer.appendChild(checkSolvedButton);
+    buttonContainer.appendChild(aiSolveButton);
+    buttonContainer.appendChild(aiShuffleButton);
     buttonContainer.appendChild(randomizeButton);
     buttonContainer.appendChild(logStateButton);
     buttonContainer.appendChild(resetButton);
