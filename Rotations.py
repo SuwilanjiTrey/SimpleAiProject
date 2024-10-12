@@ -179,4 +179,42 @@ def rotate_back_counterclockwise():
     cube_state[5][8], cube_state[5][7], cube_state[5][6], cube_state[3][8], cube_state[3][7], cube_state[3][6] = \
     cube_state[3][8], cube_state[3][7], cube_state[3][6], cube_state[4][0], cube_state[4][1], cube_state[4][2], \
     cube_state[2][0], cube_state[2][1], cube_state[2][2], cube_state[5][8], cube_state[5][7], cube_state[5][6]
+ 
+ 
+#testing rotations   
+def print_cube_state():
+    # Utility function to print the cube state for debugging
+    print("Front:", cube_state[0])
+    print("Back:", cube_state[1])
+    print("Left:", cube_state[2])
+    print("Right:", cube_state[3])
+    print("Top:", cube_state[4])
+    print("Bottom:", cube_state[5])
+    print("")
+
+# Initial cube state (each face has unique characters for easy tracking)
+cube_state = [
+    ['F'] * 9,  # Front face
+    ['B'] * 9,  # Back face
+    ['L'] * 9,  # Left face
+    ['R'] * 9,  # Right face
+    ['T'] * 9,  # Top face
+    ['D'] * 9   # Bottom face
+]
+
+# Now we can test one of the rotations
+print("Initial Cube State:")
+print_cube_state()
+
+print("After rotating the front face clockwise:")
+rotate_front_clockwise()
+print_cube_state()
+
+print("After rotating the front face counterclockwise:")
+rotate_front_counterclockwise()
+print_cube_state()
+
+# You can similarly call other rotation functions to test them
+# e.g., rotate_top_clockwise(), rotate_left_counterclockwise(), etc.
+
 

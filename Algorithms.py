@@ -26,9 +26,20 @@ def bfs_solve(cube_state):
                 
     return None # no solutions found
 
-def is_solved(state):
-    # the is solved logic here
-    pass
+def is_solved(cube):
+    #checks the cube state and constantly looping until the cube is solved
+    # Iterate through each face of the cube
+    for face in cube:
+        # Get the first element of the face
+        first_color = face[0][0]
+        
+        # Check if all elements in the face are the same as the first element
+        for row in face:
+            for color in row:
+                if color != first_color:
+                    return False
+    return True
+
 
 def get_all_possible_moves(state):
     #logic to return a list of all possible moves from the current state
@@ -65,31 +76,60 @@ def get_all_possible_moves(state):
 def apply_move(state, move):
     # logic to apply a move to the state and return the new state
     if move == 'R':
-        rotate_right_clockwise()
+        rotate_right_clockwise(state)
     elif move == 'R_prime':
-        rotate_right_counterclockwise()
+        rotate_right_counterclockwise(state)
     elif move == 'L':
-        rotate_left_clockwise()
+        rotate_left_clockwise(state)
     elif move == 'L_prime':
-        rotate_left_counterclockwise()
+        rotate_left_counterclockwise(state)
     elif move == 'F':
-        rotate_front_clockwise()
+        rotate_front_clockwise(state)
     elif move == 'F_prime':
-        rotate_front_counterclockwise()
+        rotate_front_counterclockwise(state)
     elif move == 'U':
-        rotate_top_clockwise()
+        rotate_top_clockwise(state)
     elif move == 'U_prime':
-        rotate_top_counterclockwise()
+        rotate_top_counterclockwise(state)
     elif move == 'D':
-        rotate_bottom_clockwise()
+        rotate_bottom_clockwise(state)
     elif move == 'D_prime':
-        rotate_bottom_counterclockwise()
+        rotate_bottom_counterclockwise(state)
     elif move == 'B':
-        rotate_back_clockwise()
+        rotate_back_clockwise(state)
     elif move == 'B_prime':
-        rotate_back_counterclockwise()
+        rotate_back_counterclockwise(state)
     else:
         print("Invalid move")
     
     # Return the updated state (assuming your rotation functions modify a global cube_state)
     return state
+
+
+def right_hand_algorithm():
+    # Perform the right-hand algorithm (R U R' U')
+    rotate_right_clockwise()
+    rotate_top_clockwise()
+    rotate_right_counterclockwise()
+    rotate_top_counterclockwise()
+
+    print("Right-hand algorithm executed.")
+    
+    
+if __name__ == "__main__":
+    # Define the initial cube state (solved cube)
+    cube_state = [
+        [[0, 0, 0], [0, 0, 0], [0, 0, 0]],  # Front face
+        [[1, 1, 1], [1, 1, 1], [1, 1, 1]],  # Back face
+        [[2, 2, 2], [2, 2, 2], [2, 2, 2]],  # Left face
+        [[3, 3, 3], [3, 3, 3], [3, 3, 3]],  # Right face
+        [[4, 4, 4], [4, 4, 4], [4, 4, 4]],  # Top face
+        [[5, 5, 5], [5, 5, 5], [5, 5, 5]]   # Bottom face
+    ]
+
+    # Test the right-hand algorithm
+    right_hand_algorithm()
+
+    # Optionally, print the updated cube state
+    print("Updated cube state after right-hand algorithm:")
+    print(cube_state)
